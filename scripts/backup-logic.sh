@@ -84,29 +84,10 @@ function create_snapshot(){
 }
 
 function load_wp_db_config(){
-    local wp_path="${APP_PATH:-/var/www/webroot/ROOT}"
-    if [ -e /home/jelastic/bin/wp ]; then
-        WP_CLI=/home/jelastic/bin/wp
-    elif WP_CLI=$(command -v wp 2>/dev/null); then
-        :
-    else
-        echo $(date) ${ENV_NAME} "wp-cli not found" | tee -a ${BACKUP_LOG_FILE}
-        exit 1
-    fi
-    if [ ! -f "${wp_path}/wp-config.php" ]; then
-        echo $(date) ${ENV_NAME} "wp-config.php not found in ${wp_path}" | tee -a ${BACKUP_LOG_FILE}
-        exit 1
-    fi
-    DB_NAME=$($WP_CLI config get DB_NAME --path="$wp_path" --quiet)
-    DB_USER=$($WP_CLI config get DB_USER --path="$wp_path" --quiet)
-    DB_PASSWORD=$($WP_CLI config get DB_PASSWORD --path="$wp_path" --quiet)
-    DB_HOST_FULL=$($WP_CLI config get DB_HOST --path="$wp_path" --quiet)
-    if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST_FULL" ]; then
-        echo $(date) ${ENV_NAME} "Failed to read DB credentials via wp-cli" | tee -a ${BACKUP_LOG_FILE}
-        exit 1
-    fi
-    DB_HOST=$(echo "$DB_HOST_FULL" | awk -F ':' '{print $1}')
-    DB_PORT=$(echo "$DB_HOST_FULL" | awk -F ':' '{print $2}')
+    eval "$(php -r '$c=$argv[1];$t=preg_replace("/^\s*require(_once)?\s+.*wp-settings\.php.*$/m","",file_get_contents($c));defined("ABSPATH")||define("ABSPATH",dirname($c)."/");eval("?>".$t);foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)echo$k."=".var_export(constant($k),true).PHP_EOL;' "${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php")"
+    DB_HOST_FULL=$DB_HOST
+    DB_HOST=${DB_HOST_FULL%%:*}
+    [[ $DB_HOST_FULL == *:* ]] && DB_PORT=${DB_HOST_FULL#*:}
 }
 
 function backup(){
@@ -151,8 +132,13 @@ case "$1" in
     update_restic)
 	$1
         ;;
+    read_wp_db_config)
+        APP_PATH=${2:-/var/www/webroot/ROOT}
+        load_wp_db_config
+        printf 'DB_NAME=%q\nDB_USER=%q\nDB_PASSWORD=%q\nDB_HOST=%q\n' "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$DB_HOST"
+        ;;
     *)
-        echo "Usage: $0 {backup|check_backup_repo|rotate_snapshots|create_snapshot}"
+        echo "Usage: $0 {backup|check_backup_repo|rotate_snapshots|create_snapshot|read_wp_db_config}"
         exit 2
 esac
 
