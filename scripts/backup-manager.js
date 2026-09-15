@@ -189,8 +189,13 @@ function BackupManager(config) {
             }],
             [me.cmd, [
                 'echo $(date) %(envName) Restoring the database from snapshot $(cat /root/.backupid)', 
-                '! which mysqld || service mysql start 2>&1', 
-                'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php | grep ${i} |grep -v \'^[[:space:]]*#\' | tr -d \'[[:blank:]]\' | awk -F \',\' \'{print $2}\' | tr -d "\\"\');"|tr -d \'\\r\'|tail -n 1); done', 
+                '! which mysqld || service mysql start 2>&1',
+                'if [ -e /home/jelastic/bin/wp ]; then WP_CLI=/home/jelastic/bin/wp; else WP_CLI=$(command -v wp); fi',
+                '[ -n "$WP_CLI" ] || false',
+                'DB_NAME=$($WP_CLI config get DB_NAME --path=%(appPath) --quiet)',
+                'DB_USER=$($WP_CLI config get DB_USER --path=%(appPath) --quiet)',
+                'DB_PASSWORD=$($WP_CLI config get DB_PASSWORD --path=%(appPath) --quiet)',
+                'DB_HOST=$($WP_CLI config get DB_HOST --path=%(appPath) --quiet)',
                 'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi', 
                 'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"', 'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
             ],

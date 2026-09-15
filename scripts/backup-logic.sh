@@ -83,15 +83,39 @@ function create_snapshot(){
     echo $(date) ${ENV_NAME} "End uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
 }
 
+function load_wp_db_config(){
+    local wp_path="${APP_PATH:-/var/www/webroot/ROOT}"
+    if [ -e /home/jelastic/bin/wp ]; then
+        WP_CLI=/home/jelastic/bin/wp
+    elif WP_CLI=$(command -v wp 2>/dev/null); then
+        :
+    else
+        echo $(date) ${ENV_NAME} "wp-cli not found" | tee -a ${BACKUP_LOG_FILE}
+        exit 1
+    fi
+    if [ ! -f "${wp_path}/wp-config.php" ]; then
+        echo $(date) ${ENV_NAME} "wp-config.php not found in ${wp_path}" | tee -a ${BACKUP_LOG_FILE}
+        exit 1
+    fi
+    DB_NAME=$($WP_CLI config get DB_NAME --path="$wp_path" --quiet)
+    DB_USER=$($WP_CLI config get DB_USER --path="$wp_path" --quiet)
+    DB_PASSWORD=$($WP_CLI config get DB_PASSWORD --path="$wp_path" --quiet)
+    DB_HOST_FULL=$($WP_CLI config get DB_HOST --path="$wp_path" --quiet)
+    if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST_FULL" ]; then
+        echo $(date) ${ENV_NAME} "Failed to read DB credentials via wp-cli" | tee -a ${BACKUP_LOG_FILE}
+        exit 1
+    fi
+    DB_HOST=$(echo "$DB_HOST_FULL" | awk -F ':' '{print $1}')
+    DB_PORT=$(echo "$DB_HOST_FULL" | awk -F ':' '{print $2}')
+}
+
 function backup(){
     echo $$ > /var/run/${ENV_NAME}_backup.pid
     BACKUP_ADDON_REPO=$(echo ${BASE_URL}|sed 's|https:\/\/raw.githubusercontent.com\/||'|awk -F / '{print $1"/"$2}')
     BACKUP_ADDON_BRANCH=$(echo ${BASE_URL}|sed 's|https:\/\/raw.githubusercontent.com\/||'|awk -F / '{print $3}')
     BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk '{print $1}')
     echo $(date) ${ENV_NAME} "Creating the ${BACKUP_TYPE} backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID}) on storage node ${NODE_ID}" | tee -a ${BACKUP_LOG_FILE}
-    for i in DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php|grep ${i}|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1); done
-    DB_HOST=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $1}');
-    DB_PORT=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $2}');
+    load_wp_db_config
     if [ -n "${DB_PORT}" ]; then 
         MYSQLDUMP_DB_PORT_OPTION="-P ${DB_PORT}"
     else
