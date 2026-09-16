@@ -144,7 +144,7 @@ function BackupManager(config) {
             [me.addMountForBackup, config.isAlwaysUmount],
             [me.cmd, [
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
-                'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
+                'wget --tries=10 -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
             ], {
 		nodeId: config.backupExecNode,
                 envName : config.envName,
@@ -190,9 +190,9 @@ function BackupManager(config) {
             [me.cmd, [
                 'echo $(date) %(envName) Restoring the database from snapshot $(cat /root/.backupid)', 
                 '! which mysqld || service mysql start 2>&1',
-                'wget -q -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh',
+                'wget --tries=10 -q -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh',
                 'eval "$(bash /root/%(envName)_backup-logic.sh read_wp_db_config %(appPath))"',
-                'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi', 
+                'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget --tries=10 -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi', 
                 'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"', 'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
             ],
             {
