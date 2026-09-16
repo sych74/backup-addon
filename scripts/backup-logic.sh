@@ -95,11 +95,6 @@ foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)
  if(defined($k))echo$k."=".var_export(constant($k),1).PHP_EOL;
 ' "$wp_config" 2>/dev/null)"
 
-    DB_HOST_FULL=$DB_HOST
-    DB_HOST=${DB_HOST_FULL%%:*}
-    DB_PORT=
-    [[ $DB_HOST_FULL == *:* ]] && DB_PORT=${DB_HOST_FULL#*:}
-
     if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST" ]; then
         echo $(date) ${ENV_NAME} "Failed to read DB credentials from wp-config.php" | tee -a ${BACKUP_LOG_FILE}
         exit 1
@@ -113,12 +108,7 @@ function backup(){
     BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk '{print $1}')
     echo $(date) ${ENV_NAME} "Creating the ${BACKUP_TYPE} backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID}) on storage node ${NODE_ID}" | tee -a ${BACKUP_LOG_FILE}
     load_wp_db_config
-    if [ -n "${DB_PORT}" ]; then 
-        MYSQLDUMP_DB_PORT_OPTION="-P ${DB_PORT}"
-    else
-        MYSQLDUMP_DB_PORT_OPTION=""
-    fi
-    SERVER_VERSION_STRING=$(mysql -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
+    SERVER_VERSION_STRING=$(mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
     WP_DB_STACK_NAME=$(echo $SERVER_VERSION_STRING|awk '{print $4}')
     WP_DB_STACK_NAME=${WP_DB_STACK_NAME^^}
     WP_DB_STACK_VERSION=$(echo ${SERVER_VERSION_STRING}|awk '{print $3}'|awk -F '-' '{print $1}')
@@ -128,7 +118,7 @@ function backup(){
     fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
-    mysqldump -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
+    mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     rm -f /var/run/${ENV_NAME}_backup.pid
 }
 
