@@ -84,8 +84,8 @@ function create_snapshot(){
 }
 
 function load_wp_db_config(){
-    local wp_dir="${APP_PATH:-/var/www/webroot/ROOT}" wp_config="${wp_dir}/wp-config.php"
-    [ -f "$wp_config" ] || { echo $(date) ${ENV_NAME} "wp-config.php not found in ${wp_dir}" | tee -a ${BACKUP_LOG_FILE}; exit 1; }
+    local wp_config="${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php"
+    [ -f "$wp_config" ] || { echo $(date) ${ENV_NAME} "wp-config.php not found in ${APP_PATH:-/var/www/webroot/ROOT}" | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     eval "$(php -r '
 $c=$argv[1];
 preg_match_all("/define\s*\([^;]+;/",file_get_contents($c),$m);
