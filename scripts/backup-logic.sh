@@ -87,12 +87,10 @@ function load_wp_db_config(){
     local wp_config="${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php"
     [ -f "$wp_config" ] || { echo $(date) ${ENV_NAME} "wp-config.php not found in ${APP_PATH:-/var/www/webroot/ROOT}" | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     eval "$(php -r '
-$c=$argv[1];
-preg_match_all("/define\s*\([^;]+;/",file_get_contents($c),$m);
-defined("ABSPATH")||define("ABSPATH",dirname($c)."/");
-eval("?>".implode("\n",$m[0]));
+$s=file_get_contents($argv[1]);
 foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)
- if(defined($k))echo$k."=".var_export(constant($k),1).PHP_EOL;
+ if(preg_match("/define\s*\(\s*[\x27\"]".$k."[\x27\"]\s*,\s*[\x27\"]([^\x27\"]*)[\x27\"]\s*\)/",$s,$m))
+  echo$k."=".var_export($m[1],1).PHP_EOL;
 ' "$wp_config" 2>/dev/null)"
 
     if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST" ]; then
