@@ -84,7 +84,8 @@ function create_snapshot(){
 }
 
 function load_wp_db_config(){
-    eval "$(php -r '$c=$argv[1];$t=preg_replace("/^\s*require(_once)?\s+.*wp-settings\.php.*$/m","",file_get_contents($c));defined("ABSPATH")||define("ABSPATH",dirname($c)."/");eval("?>".$t);foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)echo$k."=".var_export(constant($k),true).PHP_EOL;' "${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php")"
+    local wp_config="${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php"
+    eval "$(php -r '$c=$argv[1];$t=preg_replace("/^\s*require(_once)?\s+.*wp-settings\.php.*$/m","",file_get_contents($c));defined("ABSPATH")||define("ABSPATH",dirname($c)."/");eval("?>".$t);foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)echo$k."=".var_export(constant($k),true).PHP_EOL;' "$wp_config" 2>/dev/null)"
     DB_HOST_FULL=$DB_HOST
     DB_HOST=${DB_HOST_FULL%%:*}
     [[ $DB_HOST_FULL == *:* ]] && DB_PORT=${DB_HOST_FULL#*:}
